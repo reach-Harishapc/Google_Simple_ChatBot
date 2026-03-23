@@ -9,7 +9,12 @@ import {
   Bot, 
   Loader2,
   Trash2,
-  Sparkles
+  Sparkles,
+  Settings,
+  Key,
+  X,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -25,14 +30,32 @@ export default function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [userApiKey, setUserApiKey] = useState<string>(() => {
+    return sessionStorage.getItem('gemini_api_key') || '';
+  });
+  const [tempApiKey, setTempApiKey] = useState(userApiKey);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+  // Use user key if provided, otherwise fallback to env key
+  const activeApiKey = userApiKey || process.env.GEMINI_API_KEY || '';
+  const ai = new GoogleGenAI({ apiKey: activeApiKey });
 
   // Scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const saveApiKey = (e: React.FormEvent) => {
+    e.preventDefault();
+    setUserApiKey(tempApiKey);
+    if (tempApiKey) {
+      sessionStorage.setItem('gemini_api_key', tempApiKey);
+    } else {
+      sessionStorage.removeItem('gemini_api_key');
+    }
+    setIsSettingsOpen(false);
+  };
 
   const clearChat = () => {
     if (window.confirm('Are you sure you want to clear the conversation?')) {
@@ -43,6 +66,11 @@ export default function App() {
   const sendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!input.trim() || isLoading) return;
+
+    if (!activeApiKey) {
+      setIsSettingsOpen(true);
+      return;
+    }
 
     const userMessage = input.trim();
     const newUserMessage: ChatMessage = {
@@ -72,12 +100,20 @@ export default function App() {
       };
 
       setMessages(prev => [...prev, newAiMessage]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
+      let errorText = "⚠️ **Error:** Failed to connect to Gemini.";
+      
+      if (error?.message?.includes('API_KEY_INVALID')) {
+        errorText = "⚠️ **Invalid API Key:** The provided API key is incorrect. Please check your settings.";
+      } else if (!activeApiKey) {
+        errorText = "⚠️ **Missing API Key:** Please provide a Google AI API key in the settings to start chatting.";
+      }
+
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        content: "⚠️ **Error:** Failed to connect to Gemini. Please check your API key and connection."
+        content: errorText
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -95,7 +131,19 @@ export default function App() {
           </div>
           <h1 className="font-semibold text-zinc-900">Gemini Direct Chat</h1>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => setIsSettingsOpen(true)}
+            className={`p-2 rounded-lg transition-colors flex items-center gap-2 text-sm font-medium ${
+              userApiKey 
+                ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' 
+                : 'hover:bg-zinc-100 text-zinc-500'
+            }`}
+            title="API Settings"
+          >
+            <Settings className="w-5 h-5" />
+            {userApiKey && <span className="hidden sm:inline">Custom Key Active</span>}
+          </button>
           <button 
             onClick={clearChat}
             className="p-2 hover:bg-zinc-100 rounded-lg transition-colors text-zinc-500"
@@ -103,7 +151,7 @@ export default function App() {
           >
             <Trash2 className="w-5 h-5" />
           </button>
-          <div className="px-3 py-1 bg-emerald-50 text-emerald-600 text-xs font-semibold rounded-full border border-emerald-100">
+          <div className="hidden sm:block px-3 py-1 bg-zinc-100 text-zinc-600 text-xs font-semibold rounded-full border border-zinc-200">
             Gemini Flash
           </div>
         </div>
@@ -112,7 +160,29 @@ export default function App() {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-8 space-y-6">
         <div className="max-w-3xl mx-auto space-y-6">
-          {messages.length === 0 && (
+          {!activeApiKey && messages.length === 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-8 bg-amber-50 border border-amber-200 rounded-3xl text-center max-w-lg mx-auto"
+            >
+              <div className="w-12 h-12 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-amber-600">
+                <Key className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-semibold text-amber-900 mb-2">API Key Required</h3>
+              <p className="text-amber-700 text-sm mb-6">
+                To start chatting, please provide your own Google AI API key. It will only be stored in your browser's session storage.
+              </p>
+              <button 
+                onClick={() => setIsSettingsOpen(true)}
+                className="px-6 py-2.5 bg-amber-600 text-white rounded-xl font-medium hover:bg-amber-700 transition-colors shadow-sm"
+              >
+                Set API Key
+              </button>
+            </motion.div>
+          )}
+
+          {messages.length === 0 && activeApiKey && (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <motion.div 
                 initial={{ scale: 0.8, opacity: 0 }}
@@ -201,7 +271,7 @@ export default function App() {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask Gemini anything..."
+            placeholder={activeApiKey ? "Ask Gemini anything..." : "Set API key to start chatting..."}
             disabled={isLoading}
             className="w-full px-6 py-5 bg-zinc-50 border border-zinc-200 rounded-2xl focus:outline-none focus:ring-4 focus:ring-zinc-900/5 focus:border-zinc-900 transition-all disabled:opacity-50 pr-16 shadow-sm group-hover:border-zinc-300"
           />
@@ -217,6 +287,95 @@ export default function App() {
           Stateless Session • Gemini 3 Flash
         </p>
       </div>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsSettingsOpen(false)}
+              className="absolute inset-0 bg-zinc-900/40 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-zinc-200 overflow-hidden"
+            >
+              <div className="p-6 border-b border-zinc-100 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-zinc-100 rounded-xl text-zinc-600">
+                    <Key className="w-5 h-5" />
+                  </div>
+                  <h2 className="text-xl font-semibold text-zinc-900">API Settings</h2>
+                </div>
+                <button 
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="p-2 hover:bg-zinc-100 rounded-full transition-colors text-zinc-400"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={saveApiKey} className="p-6 space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-700 mb-2">
+                    Google AI API Key
+                  </label>
+                  <div className="relative">
+                    <input 
+                      type="password"
+                      value={tempApiKey}
+                      onChange={(e) => setTempApiKey(e.target.value)}
+                      placeholder="Enter your API key..."
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-zinc-900/10 focus:border-zinc-900 transition-all pr-10"
+                    />
+                    {userApiKey && tempApiKey === userApiKey && (
+                      <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-emerald-500" />
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs text-zinc-500 leading-relaxed">
+                    Your key is stored in <span className="font-semibold">session storage</span>. It will be cleared when you close the tab. No data is sent to our servers.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-zinc-50 rounded-2xl border border-zinc-200">
+                  <div className="flex gap-3">
+                    <AlertCircle className="w-5 h-5 text-zinc-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs text-zinc-600 space-y-1">
+                      <p className="font-semibold text-zinc-900">Where to get a key?</p>
+                      <p>You can get a free Gemini API key from the <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-zinc-900 underline font-medium">Google AI Studio</a>.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setTempApiKey('');
+                      setUserApiKey('');
+                      sessionStorage.removeItem('gemini_api_key');
+                    }}
+                    className="flex-1 px-4 py-3 bg-zinc-100 text-zinc-600 rounded-xl font-medium hover:bg-zinc-200 transition-colors"
+                  >
+                    Clear Key
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 px-4 py-3 bg-zinc-900 text-white rounded-xl font-medium hover:bg-zinc-800 transition-colors shadow-md active:scale-95"
+                  >
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
