@@ -12,6 +12,7 @@ View your app in AI Studio: https://ai.studio/apps/5d9babe0-2e7c-4be3-b08c-83957
 
 **Prerequisites:**  Node.js
 
+![Chat Interface Demo](demo.png)
 
 1. Install dependencies:
    `npm install`
