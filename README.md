@@ -15,6 +15,10 @@ View your app in AI Studio: https://ai.studio/apps/5d9babe0-2e7c-4be3-b08c-83957
 ![Chat Interface Demo](demo.png)
 
 
+live demo : 
+
+https://ornate-hamster-6be4a9.netlify.app/
+
 1. Install dependencies:
    `npm install`
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
