@@ -7,7 +7,6 @@
 This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/5d9babe0-2e7c-4be3-b08c-83957dbcd084
-View demo link: https://ornate-hamster-6be4a9.netlify.app/
 
 ## Run Locally
 
