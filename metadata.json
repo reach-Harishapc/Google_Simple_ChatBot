@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Chatbot",
+  "description": "A simple chatbot powered by Google Gemini, with Firebase authentication and chat history persistence.",
+  "requestFramePermissions": []
+}
